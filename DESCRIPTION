@@ -12,3 +12,5 @@ Imports:
     Rcpp, RcppEigen, Matrix, data.table, mgcv, gridExtra, parallel, stats, nloptr
 LinkingTo:
     Rcpp, RcppEigen,
+URL: https://github.com/YutingDuan22/RISEX
+BugReports: https://github.com/YutingDuan22/RISEX/issues
