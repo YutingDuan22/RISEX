@@ -103,8 +103,6 @@ voxel.wise.fit <- function(img, cov_mat, voxels, psi_mat = NULL, lambda = NULL, 
               sigma0 = sigma0, sigma1 = sigma1))
 }
 
-#######################
-
 
 
 
@@ -270,8 +268,6 @@ obj.value = function(img,
   return(
     sum(pmin(residual ^ 2 / sigma ^ 2, zeta_gamma)) / num_obs
     +  zeta * sum(pmin((beta[neig_id[, "i"], ] - beta[neig_id[, "j"], ]) ^ 2, rep(tau, each = dim(neig_id)[1])))
-    #+ num_obs * zeta * sum(pmin((beta[-(1:num_grids), ] - beta[-((num_voxel - num_grids + 1):num_voxel), ]) ^ 2, tau))
-    #+ num_obs * zeta * sum(pmin((beta[-(1 + num_grids * (0:(num_grids - 1))), ] - beta[-num_grids * (1:num_grids), ]) ^ 2, tau))
     + sum(rowSums(alpha ^ 2) / lambda) / num_obs
     +  zeta0 * sum(pmin(beta ^ 2 / tau0, 1)) #num_obs *
   )
@@ -401,7 +397,7 @@ smooth.fit.adj = function(img,
                           sigma0 = NULL,
                           update_sigma = T,
                           zeta = 2 / sigma0^2,
-                          tau = calculate_tau(beta0, adj$adj_matrix),  ##mean((neighboring difference of beta0)^2) * 0.95
+                          tau = calculate_tau(beta0, adj$adj_matrix),  
                           zeta0 = 0.1 / sigma0^2 ,
                           tau0 = (1e-3) ^ 2,
                           zeta_gamma = 2.5 ^ 2,
@@ -698,8 +694,7 @@ smooth.fit.adj = function(img,
     estimation_mm = metrics(true_beta, beta)
   }
 
-  #write.csv(beta, paste0("est_beta", "_zeta_", zeta, "_tau_", tau, "_zeta0_",zeta0, ".csv", sep = ""), row.names = FALSE)
-
+  
   if (is.null(true_beta)) {
     return(list(
       beta = beta,
