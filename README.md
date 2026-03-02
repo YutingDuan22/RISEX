@@ -8,3 +8,4 @@ Robust Image-on-scalar Regression with Simultaneous Activation Region and Extrem
 ```r
 remotes::install_github("YutingDuan22/RISEX")
 
+![RISE-X Example](Simu_RISEX.png)
