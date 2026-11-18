@@ -381,7 +381,7 @@ obj.value = function(img,
 #' @importFrom stats rnorm median sd
 #' @importFrom Matrix Matrix Diagonal sparseMatrix kronecker summary
 #' @export
-smooth.fit.adj = function(img,
+RISEX = function(img,
                           voxels,
                           cov_mat,
                           psi_mat,
