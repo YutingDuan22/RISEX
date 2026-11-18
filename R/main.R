@@ -288,6 +288,16 @@ calculate_tau <- function(beta0, adj_matrix, constant = 0.95) {
   
   return(constant*mean_neigb_sqr)
 }
+calculate_passtau <- function(beta0, adj_matrix, tau) {
+  
+  neig_id <- as.matrix(summary(adj_matrix))
+  neig_id <- neig_id[neig_id[, "i"] < neig_id[, "j"], ]
+  
+  num_passtau <- sum((beta0[neig_id[, "i"], ] - beta0[neig_id[, "j"], ]) ^ 2 > tau)
+  
+  return(num_passtau)
+}
+
 
 #' RISE-X main fitting routine with adjacency-based spatial regularization
 #'
