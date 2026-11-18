@@ -9,7 +9,7 @@ Robust Image-on-scalar Regression with Simultaneous Activation Region and Extrem
 remotes::install_github("YutingDuan22/RISEX")
 ```
 
-# Reproducible Workflow
+## Reproducible Workflow
 
 ```r
 library(RISEX)
@@ -22,5 +22,9 @@ RISEX <- RISEX(img=img, voxels=voxels, cov_mat=cov_mat,
               sigma0 = voxel_wise_fit$sigma0)
 ```
 
+## Evaluation
+```r
+metrics(true_beta, RISEX$beta)
+```
 
 ![RISE-X Example](Simu_RISEX.png)
