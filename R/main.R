@@ -701,8 +701,8 @@ RISEX = function(img,
   likelihood = num_obs*sum(log(sigma))
   AIC = 2*num_obs*sum(log(sigma)) + sum(beta !=0) * 2
   BIC = 2*num_obs*sum(log(sigma)) + sum(beta !=0) * log(num_obs * num_voxel)
-  adjAIC = 2*num_obs*sum(log(sigma)) + calculate_passtau(beta, adj$adj_matrix, tau)*2
-  adjBIC = 2*num_obs*sum(log(sigma)) + calculate_passtau(beta, adj$adj_matrix, tau) * log(num_obs * num_voxel)
+  #adjAIC = 2*num_obs*sum(log(sigma)) + calculate_passtau(beta, adj$adj_matrix, tau)*2
+  #adjBIC = 2*num_obs*sum(log(sigma)) + calculate_passtau(beta, adj$adj_matrix, tau) * log(num_obs * num_voxel)
 
   if (!is.null(true_beta)) {
     estimation_mm = metrics(true_beta, beta)
