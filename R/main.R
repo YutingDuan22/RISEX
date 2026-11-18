@@ -91,7 +91,8 @@ voxel.wise.fit <- function(img, cov_mat, voxels, psi_mat = NULL, lambda = NULL, 
     psi_mat <- svd_res$u[, 1:cut_off, drop = FALSE]
     lambda <- matrix(svd_res$d[1:cut_off]^2, cut_off, 1)
   }
-  alpha=solve(t(psi_mat)%*%psi_mat+diag(1/lambda),t(psi_mat)%*%eta_est)
+  lambda_vec <- as.numeric(lambda)  # lambda may be a K x 1 matrix; diag() of a matrix extracts its diagonal
+  alpha=solve(t(psi_mat)%*%psi_mat+diag(1/lambda_vec, length(lambda_vec)),t(psi_mat)%*%eta_est)
   eta = psi_mat%*%alpha
   eps = eta_est-eta
 
@@ -433,6 +434,7 @@ RISEX = function(img,
                           #tol = 1e-3,
                           tol.beta = 1e-3,
                           tol.obj = 1e-4) {
+  lambda = as.numeric(lambda)
   t0 = proc.time()
   time.prepare = 0
   time.gamma = 0
@@ -458,7 +460,7 @@ RISEX = function(img,
   }
   sigma0 = sigma0
 
-  A_alpha = t(psi_mat / sigma) %*% (psi_mat / sigma) + diag(1 / lambda)
+  A_alpha = t(psi_mat / sigma) %*% (psi_mat / sigma) + diag(1 / lambda, num_lambda)
   A_alpha = solve(A_alpha, t(psi_mat / sigma ^ 2))
 
   x = rnorm(10000000)
@@ -570,7 +572,7 @@ RISEX = function(img,
       beta_A_residual = as(kronecker(-cov_mat, Diagonal(n = num_voxel, x = 1/sigma/sqrt(num_obs))), "dgCMatrix") #as(kronecker(-cov_mat, Diagonal(n = num_voxel, x = 1/sigma)), "dgCMatrix")
       A = rbind(beta_A_residual, beta_A_smooth, beta_A_sparse)
 
-      A_alpha = t(psi_mat / sigma) %*% (psi_mat / sigma) + diag(1 / lambda)
+      A_alpha = t(psi_mat / sigma) %*% (psi_mat / sigma) + diag(1 / lambda, num_lambda)
       A_alpha = solve(A_alpha, t(psi_mat / sigma ^ 2))
 
       if (trace) {
