@@ -686,7 +686,7 @@ RISEX = function(img,
 
     if ((max(abs(beta - beta.old)) < tol.beta)) {
       break
-    } else if (abs(obj - obj.old) != Inf) {
+    } else if (is.finite(obj) && is.finite(obj.old)) {
       if ((abs(obj - obj.old)/ abs(obj.old + 1e-8) < tol.obj))
         break
     }
