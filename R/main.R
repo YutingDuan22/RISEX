@@ -729,7 +729,7 @@ RISEX = function(img,
       total_time = total_time[3],
       AIC = AIC,
       BIC = BIC,
-      likelihood = likelihood
+      likelihood = likelihood,
       adjAIC = adjAIC,
       adjBIC = adjBIC
     ))
