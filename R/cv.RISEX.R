@@ -1,10 +1,12 @@
+
 #' K-fold cross-validation for tuning \code{zeta} and \code{zeta0} in RISE-X
 #'
 #' Selects the spatial smoothing penalty \code{zeta} and the sparsity penalty
 #' \code{zeta0} of \code{\link{RISEX}} by K-fold cross-validation
 #' over subjects. For each fold, the model is fitted on the training subjects
 #' for every \code{(zeta, zeta0)} pair on the grid, and the fitted model is
-#' scored on the held-out subjects with a robust (truncated) prediction loss.
+#' scored on the held-out subjects with a robust (truncated) weighted squared
+#' error whose voxel weights are fixed within each fold.
 #'
 #' @param img Numeric matrix (\eqn{V \times N}) of images, one column per subject.
 #' @param voxels Numeric matrix (\eqn{V \times 3}) of voxel coordinates.
@@ -35,7 +37,15 @@
 #'   used as the truncation level of the CV loss. Default \code{2.5^2}.
 #' @param tau0 Sparsity scale passed to \code{RISEX}. Default
 #'   \code{(1e-3)^2}.
-#' @param loss Held-out loss. \code{"robust"} (default) uses the truncated
+#' @param loss Held-out loss. \code{"robust"} (default) and \code{"mse"} are
+#'   described below. \code{"wmse"} is WMSE exactly as written in the paper:
+#'   for each held-out subject, \eqn{\sum_s \{Y_i(s) - \hat Y_i(s)\}^2 /
+#'   \hat\sigma^2(s)}, averaged over held-out subjects, where \eqn{\hat\beta},
+#'   \eqn{\hat\sigma(\cdot)} come from the training fit and
+#'   \eqn{\hat\eta_i = \Psi\hat\alpha_i} uses the \eqn{\alpha} update.
+#'   Because the weights \eqn{\hat\sigma^{2(-k)}} change with the tuning values
+#'   (heavier penalties inflate \eqn{\hat\sigma}), it can favour all-zero fits;
+#'   it is kept for comparison. \code{"robust"} uses the truncated
 #'   standardized squared error \eqn{\min(r^2/\sigma^2, \zeta_\gamma)}, matching
 #'   the RISE-X data-fit term so extreme signals in test subjects do not dominate
 #'   the CV error; \code{"mse"} uses the plain standardized squared error.
@@ -79,7 +89,8 @@
 #' outlier trimming of \eqn{\hat\gamma_i}. The loss is computed on
 #' \eqn{r_i - \Psi \hat\alpha_i}.
 #'
-#' To make errors comparable across tuning values, residuals are standardized
+#' For \code{loss = "robust"} or \code{"mse"}, to make errors comparable
+#' across tuning values, residuals are standardized
 #' by a fixed per-fold reference scale (robust MAD of training-fold OLS
 #' residuals), not by each fit's own \code{sigma} estimate.
 #'
@@ -116,7 +127,7 @@ cv.RISEX <- function(img,
                      sigma0 = NULL,
                      zeta_gamma = 2.5^2,
                      tau0 = (1e-3)^2,
-                     loss = c("robust", "mse"),
+                     loss = c("robust", "wmse", "mse"),
                      refit_basis = FALSE,
                      refit = TRUE,
                      rule = c("min", "1se"),
@@ -131,11 +142,21 @@ cv.RISEX <- function(img,
   N <- ncol(img)
   V <- nrow(img)
   if (nrow(cov_mat) != N) stop("nrow(cov_mat) must equal ncol(img).")
+  ## ---- input checks (common causes of NA CV losses) ----
+  if (anyNA(img)) stop("`img` contains NA/NaN values (e.g. out-of-mask voxels). Remove those voxels (rows) first.")
+  if (anyNA(cov_mat)) stop("`cov_mat` contains NA values. Remove or impute those subjects first.")
+  if (anyNA(psi_mat) || anyNA(lambda)) stop("`psi_mat` or `lambda` contains NA values.")
+  if (nrow(voxels) != V) stop("nrow(voxels) must equal nrow(img).")
+  if (nrow(psi_mat) != V) stop("nrow(psi_mat) must equal nrow(img).")
   if (missing(tau)) stop("Please supply `tau` (a number/vector or a function(beta0, adj_matrix)).")
   lambda <- as.numeric(lambda)
-
+ 
   if (is.null(adj)) adj <- coordinates_to_adjacency_matrix.nf(voxels)
-
+  if (sum(adj$adj_x) + sum(adj$adj_y) + sum(adj$adj_z) == 0) {
+    stop("No neighbouring voxels found. `voxels` must be integer grid indices ",
+         "(neighbours differ by 1), not mm/MNI coordinates.")
+  }
+ 
   ## ---- default grids (relative to sigma0) ----
   if (is.null(zeta_grid) || is.null(zeta0_grid)) {
     if (is.null(sigma0)) {
@@ -147,7 +168,7 @@ cv.RISEX <- function(img,
   }
   grid <- expand.grid(zeta = sort(zeta_grid), zeta0 = sort(zeta0_grid))
   n_grid <- nrow(grid)
-
+ 
   ## ---- folds over subjects ----
   if (is.null(foldid)) {
     if (!is.null(seed)) set.seed(seed)
@@ -158,7 +179,7 @@ cv.RISEX <- function(img,
     foldid <- as.integer(factor(foldid))
   }
   K <- max(foldid)
-
+ 
   ## ---- per-fold quantities shared across the grid ----
   fold_info <- lapply(seq_len(K), function(k) {
     tr <- which(foldid != k)
@@ -182,7 +203,7 @@ cv.RISEX <- function(img,
     list(tr = tr, te = te, beta0 = ols$beta, s_ref = s_ref,
          psi = psi_k, lambda = lam_k, sigma = sig_init, tau = tau_k)
   })
-
+ 
   ## ---- fit + score every (fold, grid) job ----
   jobs <- expand.grid(g = seq_len(n_grid), k = seq_len(K))
   run_job <- function(j) {
@@ -219,9 +240,14 @@ cv.RISEX <- function(img,
       sigma_fit = fit$sigma, s_ref = fi$s_ref,
       zeta_gamma = zeta_gamma, loss = loss
     )
-    list(err = err, nonzero = sum(fit$beta != 0), msg = NULL)
+    msg <- if (!is.finite(err)) {
+      sprintf("held-out loss not finite (NA in fitted sigma: %s; NA in beta: %s)",
+              anyNA(fit$sigma), anyNA(fit$beta))
+    } else NULL
+    list(err = if (is.finite(err)) err else NA_real_,
+         nonzero = sum(fit$beta != 0), msg = msg)
   }
-
+ 
   if (.Platform$OS.type == "windows") n_cores <- 1
   if (verbose) message(sprintf("Fitting %d grid points x %d folds = %d fits on %d core(s)...",
                                n_grid, K, nrow(jobs), n_cores))
@@ -235,24 +261,24 @@ cv.RISEX <- function(img,
       out
     })
   }
-
+ 
   msgs <- unique(unlist(lapply(res, `[[`, "msg")))
-  if (length(msgs)) warning("Some fits failed: ", paste(msgs, collapse = " | "))
-
+  if (length(msgs)) warning("Some fits/losses failed: ", paste(msgs, collapse = " | "))
+ 
   cv_folds <- matrix(sapply(res, `[[`, "err"), n_grid, K)
   nz_folds <- matrix(sapply(res, `[[`, "nonzero"), n_grid, K)
-  if (all(is.na(cv_folds))) stop("All fits failed: ", paste(msgs, collapse = " | "))
-
+  if (all(is.na(cv_folds))) stop("All CV losses are NA: ", paste(msgs, collapse = " | "))
+ 
   cvm  <- rowMeans(cv_folds, na.rm = TRUE)
   cvsd <- apply(cv_folds, 1, sd, na.rm = TRUE) / sqrt(rowSums(!is.na(cv_folds)))
   cv_table <- data.frame(grid, cvm = cvm, cvsd = cvsd,
                          nonzero = rowMeans(nz_folds, na.rm = TRUE))
-
+ 
   i_min <- which.min(cvm)
   ok <- which(cvm <= cvm[i_min] + cvsd[i_min])
   ok <- ok[order(-grid$zeta0[ok], -grid$zeta[ok])]
   i_1se <- ok[1]
-
+ 
   out <- list(
     cv_table = cv_table,
     cv_folds = cv_folds,
@@ -260,7 +286,7 @@ cv.RISEX <- function(img,
     zeta.1se = grid$zeta[i_1se], zeta0.1se = grid$zeta0[i_1se],
     foldid = foldid, loss = loss, rule = rule
   )
-
+ 
   ## ---- refit on all subjects ----
   if (refit) {
     i_sel <- if (rule == "min") i_min else i_1se
@@ -277,20 +303,20 @@ cv.RISEX <- function(img,
       trace = FALSE, plot = FALSE, ...
     )
   }
-
+ 
   class(out) <- "cv.risex"
   out
 }
-
-
+ 
+ 
 ## Closed-form voxel-wise OLS: beta (V x p) and residuals (V x N)
 .ols_fit <- function(img, cov_mat) {
   XtX_inv_Xt <- solve(crossprod(cov_mat), t(cov_mat))   # p x N
   beta <- img %*% t(XtX_inv_Xt)                          # V x p
   list(beta = beta, resid = img - beta %*% t(cov_mat))
 }
-
-
+ 
+ 
 ## Held-out loss for one fitted model
 .cv_heldout_loss <- function(y, X, beta, psi, lambda, sigma_fit, s_ref,
                              zeta_gamma, loss, n_iter = 10) {
@@ -308,13 +334,19 @@ cv.RISEX <- function(img,
     if (max(abs(gamma_new - gamma)) < 1e-8) { gamma <- gamma_new; break }
     gamma <- gamma_new
   }
+  if (loss == "wmse") {
+    # paper (Sec 2.2.3): alpha update without trimming, weights 1 / sigma_fit^2,
+    # sum over voxels, average over held-out subjects
+    alpha <- A_alpha %*% r
+    return(sum(((r - psi %*% alpha) / sigma_fit)^2) / ncol(r))
+  }
   alpha <- A_alpha %*% (r - gamma)
   z2 <- ((r - psi %*% alpha) / s_ref)^2
   if (loss == "robust") z2 <- pmin(z2, zeta_gamma)
   mean(z2)
 }
-
-
+ 
+ 
 #' @export
 print.cv.risex <- function(x, ...) {
   cat("RISE-X cross-validation (", length(unique(x$foldid)), "-fold, ",
@@ -324,8 +356,8 @@ print.cv.risex <- function(x, ...) {
   if (!is.null(x$fit)) cat("  Refit (", x$rule, " rule) stored in $fit\n", sep = "")
   invisible(x)
 }
-
-
+ 
+ 
 #' Plot cross-validation curves for RISE-X
 #'
 #' Plots the mean CV error (with \eqn{\pm 1} SE bars) against \code{zeta0}
