@@ -273,6 +273,12 @@ obj.value = function(img,
   )
 }
 
+#' Compute the smoothness threshold tau
+#'
+#' @param beta0 Initial coefficients (V x p).
+#' @param adj_matrix Sparse voxel adjacency matrix.
+#' @return Numeric scalar or length-p vector of tau values.
+#' @export
 calculate_tau <- function(beta0, adj_matrix, constant = 0.95) {
   
   neig_id <- as.matrix(summary(adj_matrix))
