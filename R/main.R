@@ -273,7 +273,15 @@ obj.value = function(img,
   )
 }
 
-
+calculate_tau <- function(beta0, adj_matrix, constant = 0.95) {
+  
+  neig_id <- as.matrix(summary(adj_matrix))
+  neig_id <- neig_id[neig_id[, "i"] < neig_id[, "j"], ]
+  
+  mean_neigb_sqr <- apply((beta0[neig_id[, "i"], ] - beta0[neig_id[, "j"], ]) ^ 2, 2, mean)
+  
+  return(constant*mean_neigb_sqr)
+}
 
 #' RISE-X main fitting routine with adjacency-based spatial regularization
 #'
