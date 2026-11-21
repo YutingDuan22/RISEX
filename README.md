@@ -5,8 +5,15 @@ This is the R package (RISEX) for "Robust Image-on-scalar Regression with Simult
 
 ## Installation
 
+1. Download the anonymized repository as a ZIP file from:
+   https://anonymous.4open.science/r/RISEX-C24D/
+
+2. Extract the ZIP file.
+
+3. Install the R package from the extracted directory:
+
 ```r
-remotes::install_github("YutingDuan22/RISEX")
+remotes::install_local("path/to/RISEX")
 ```
 
 ## Reproducible Workflow
