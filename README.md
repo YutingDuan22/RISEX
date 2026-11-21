@@ -1,6 +1,6 @@
 # RISE-X
 
-Robust Image-on-scalar Regression with Simultaneous Activation Region and Extreme Signal Detection
+This is the R package (RISEX) for "Robust Image-on-scalar Regression with Simultaneous Activation Region and Extreme Signal Detection".
 
 
 ## Installation
