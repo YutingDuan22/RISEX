@@ -19,7 +19,8 @@
 #' is computed once per fold and shared across the grid.
 #'
 #' @param img Numeric matrix (\eqn{V \times N}) of images, one column per subject.
-#' @param voxels Numeric matrix (\eqn{V \times 3}) of integer grid coordinates.
+#' @param voxels Numeric matrix (\eqn{V \times 2} for 2D or \eqn{V \times 3}
+#'   for 3D) of integer grid coordinates.
 #' @param cov_mat Numeric matrix (\eqn{N \times p}) of covariates.
 #' @param zeta_grid Numeric vector of candidate \code{zeta} values.
 #' @param zeta0_grid Numeric vector of candidate \code{zeta0} values.
@@ -30,7 +31,9 @@
 #'   \code{sample(rep(1:nfolds, length.out = N))}. Default \code{123}.
 #' @param adj Adjacency list from \code{\link{coordinates_to_adjacency_matrix.nf}}.
 #'   Built from \code{voxels} with \code{connectivity} if \code{NULL}.
-#' @param connectivity Connectivity used when \code{adj} is \code{NULL}.
+#' @param connectivity Connectivity used when \code{adj} is \code{NULL}:
+#'   \code{4} or \code{8} for 2D, \code{6}, \code{18} or \code{26} for 3D.
+#'   \code{NULL} (default) uses 4 for 2D and 6 for 3D.
 #' @param c_tau Multiplier passed to \code{\link{calculate_tau}}. Default \code{0.9}.
 #' @param zeta_gamma Outlier threshold passed to \code{RISEX}. Default \code{2.5^2}.
 #' @param psi_mat,lambda Optional fixed eigenbasis. If \code{NULL} (default),
@@ -92,7 +95,7 @@ cv.RISEX <- function(img,
                      foldid = NULL,
                      seed = 123,
                      adj = NULL,
-                     connectivity = 6,
+                     connectivity = NULL,
                      c_tau = 0.9,
                      zeta_gamma = 2.5^2,
                      psi_mat = NULL,
@@ -114,6 +117,7 @@ cv.RISEX <- function(img,
   ## ---- input checks (common causes of NA CV errors) ----
   if (nrow(cov_mat) != N) stop("nrow(cov_mat) must equal ncol(img).")
   if (nrow(voxels) != V) stop("nrow(voxels) must equal nrow(img).")
+  if (!ncol(voxels) %in% c(2, 3)) stop("`voxels` must have 2 (2D) or 3 (3D) columns.")
   if (anyNA(img)) stop("`img` contains NA/NaN values (e.g. out-of-mask voxels). Remove those voxels (rows) first.")
   if (anyNA(cov_mat)) stop("`cov_mat` contains NA values. Remove or impute those subjects first.")
   if (!is.null(psi_mat) && (is.null(lambda) || nrow(psi_mat) != V)) {
@@ -123,7 +127,13 @@ cv.RISEX <- function(img,
     stop("RISEX() has no `tol` argument; use `tol.beta` and/or `tol.obj`.")
   }
 
-  if (is.null(adj)) adj <- coordinates_to_adjacency_matrix.nf(voxels, connectivity = connectivity)
+  if (is.null(adj)) {
+    adj <- if (is.null(connectivity)) {
+      coordinates_to_adjacency_matrix.nf(voxels)
+    } else {
+      coordinates_to_adjacency_matrix.nf(voxels, connectivity = connectivity)
+    }
+  }
   if (sum(adj$adj_x) + sum(adj$adj_y) + sum(adj$adj_z) == 0) {
     stop("No neighbouring voxels found. `voxels` must be integer grid indices ",
          "(neighbours differ by 1), not mm/MNI coordinates.")
@@ -306,5 +316,3 @@ plot.cv.risex <- function(x, which = x$select_by, ...) {
          pch = 19, bty = "n", cex = 0.8)
   invisible(x)
 }
-
-
